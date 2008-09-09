@@ -455,7 +455,7 @@ class Database(object):
         resource = Resource(None, uri(self.resource.uri, *attachement_uri.split('/')))
         return resource.put(content=content, 
                             headers={'Content-Type': content_type},
-
+                            rev=doc["_rev"])
 
 class Document(dict):
     """Representation of a document in the database.
