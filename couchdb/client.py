@@ -369,38 +369,20 @@ class Database(object):
         
         >>> del server['python-tests']
         
-        If an object in the documents list is not a dictionary, this method
-        looks for an ``items()`` method that can be used to convert the object
-        to a dictionary. In this case, the returned generator will not update
-        and yield the original object, but rather yield a dictionary with
-        ``id`` and ``rev`` keys.
-        
-        :param documents: a sequence of dictionaries or `Document` objects, or
-                          objects providing a ``items()`` method that can be
-                          used to convert them to a dictionary
+        :param documents: a sequence of dictionaries or `Document` objects
         :return: an iterable over the resulting documents
         :rtype: ``generator``
         
         :since: version 0.2
         """
-        docs = []
-        for doc in documents:
-            if isinstance(doc, dict):
-                docs.append(doc)
-            elif hasattr(doc, 'items'):
-                docs.append(dict(doc.items()))
-            else:
-                raise TypeError('expected dict, got %s' % type(doc))
-        data = self.resource.post('_bulk_docs', content={'docs': docs})
+        documents = list(documents)
+        data = self.resource.post('_bulk_docs', content={'docs': documents})
         assert data['ok'] # FIXME: Should probably raise a proper exception
         def _update():
             for idx, result in enumerate(data['new_revs']):
                 doc = documents[idx]
-                if isinstance(doc, dict):
-                    doc.update({'_id': result['id'], '_rev': result['rev']})
-                    yield doc
-                else:
-                    yield result
+                doc.update({'_id': result['id'], '_rev': result['rev']})
+                yield doc
         return _update()
 
     def view(self, name, wrapper=None, **options):
@@ -429,6 +411,33 @@ class Database(object):
         return PermanentView(uri(self.resource.uri, *name.split('/')), name,
                              wrapper=wrapper,
                              http=self.resource.http)(**options)
+
+    def delete_attachment(self, doc, filename):
+        """Delete an attachment from the specified doc id and filename"""
+        attachement_uri = doc["_id"] + "/" + filename
+        resource = Resource(None, uri(self.resource.uri, *attachement_uri.split('/')))
+        return resource.delete(rev=doc["_rev"])
+
+    def get_attachment(self, id_or_doc, filename, default=None):
+        """Return an attachment from the specified doc id and filename"""
+        if isinstance(id_or_doc, str):
+            id = id_or_doc
+        else:
+            id = id_or_doc["_id"]
+        try:
+            attachement_uri = id + "/" + filename
+            resource = Resource(None, uri(self.resource.uri, *attachement_uri.split('/')))
+            return resource.get()
+        except ResourceNotFound:
+            return default
+
+    def put_attachment(self, doc, filename, content, content_type):
+        """Create or update an attachment"""
+        attachement_uri = doc["_id"] + "/" + filename
+        resource = Resource(None, uri(self.resource.uri, *attachement_uri.split('/')))
+        return resource.put(content=content, 
+                            headers={'Content-Type': content_type},
+                            rev=doc["_rev"])
 
 
 class Document(dict):
@@ -687,7 +696,6 @@ class Resource(object):
                 headers.setdefault('Content-Type', 'application/json')
             else:
                 body = content
-
         resp, data = self.http.request(uri(self.uri, path, **params), method,
                                        body=body, headers=headers)
         status_code = int(resp.status)

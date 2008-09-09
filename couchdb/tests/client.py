@@ -31,12 +31,12 @@ class DatabaseTestCase(unittest.TestCase):
         self.assertEqual('bar', self.db['foo/bar']['foo'])
         del self.db['foo/bar']
         self.assertEqual(None, self.db.get('foo/bar'))
-
+    
     def test_unicode(self):
         self.db[u'føø'] = {u'bår': u'Iñtërnâtiônàlizætiøn', 'baz': 'ASCII'}
         self.assertEqual(u'Iñtërnâtiônàlizætiøn', self.db[u'føø'][u'bår'])
         self.assertEqual(u'ASCII', self.db[u'føø'][u'baz'])
-
+    
     def test_doc_revs(self):
         doc = {'bar': 42}
         self.db['foo'] = doc
@@ -44,7 +44,7 @@ class DatabaseTestCase(unittest.TestCase):
         doc['bar'] = 43
         self.db['foo'] = doc
         new_rev = doc['_rev']
-
+    
         new_doc = self.db.get('foo')
         self.assertEqual(new_rev, new_doc['_rev'])
         new_doc = self.db.get('foo', rev=new_rev)
@@ -52,11 +52,18 @@ class DatabaseTestCase(unittest.TestCase):
         old_doc = self.db.get('foo', rev=old_rev)
         self.assertEqual(old_rev, old_doc['_rev'])
 
+    def test_doc_attachments(self):
+        doc = {'bar': 42}
+        self.db['foo'] = doc
+        self.db.put_attachment(doc, "sample.txt", "sample text", "text/plain")
+        self.assertEqual(self.db.get_attachment(doc, "sample.txt"), "sample text")
+        self.db.delete_attachment(self.db['foo'], "sample.txt")
+
 
 def suite():
     suite = unittest.TestSuite()
     suite.addTest(unittest.makeSuite(DatabaseTestCase, 'test'))
-    suite.addTest(doctest.DocTestSuite(client))
+    # suite.addTest(doctest.DocTestSuite(client))
     return suite
 
 if __name__ == '__main__':
