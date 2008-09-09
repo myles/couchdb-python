@@ -369,20 +369,38 @@ class Database(object):
         
         >>> del server['python-tests']
         
-        :param documents: a sequence of dictionaries or `Document` objects
+        If an object in the documents list is not a dictionary, this method
+        looks for an ``items()`` method that can be used to convert the object
+        to a dictionary. In this case, the returned generator will not update
+        and yield the original object, but rather yield a dictionary with
+        ``id`` and ``rev`` keys.
+        
+        :param documents: a sequence of dictionaries or `Document` objects, or
+                          objects providing a ``items()`` method that can be
+                          used to convert them to a dictionary
         :return: an iterable over the resulting documents
         :rtype: ``generator``
         
         :since: version 0.2
         """
-        documents = list(documents)
-        data = self.resource.post('_bulk_docs', content={'docs': documents})
+        docs = []
+        for doc in documents:
+            if isinstance(doc, dict):
+                docs.append(doc)
+            elif hasattr(doc, 'items'):
+                docs.append(dict(doc.items()))
+            else:
+                raise TypeError('expected dict, got %s' % type(doc))
+        data = self.resource.post('_bulk_docs', content={'docs': docs})
         assert data['ok'] # FIXME: Should probably raise a proper exception
         def _update():
             for idx, result in enumerate(data['new_revs']):
                 doc = documents[idx]
-                doc.update({'_id': result['id'], '_rev': result['rev']})
-                yield doc
+                if isinstance(doc, dict):
+                    doc.update({'_id': result['id'], '_rev': result['rev']})
+                    yield doc
+                else:
+                    yield result
         return _update()
 
     def view(self, name, wrapper=None, **options):
@@ -437,7 +455,6 @@ class Database(object):
         resource = Resource(None, uri(self.resource.uri, *attachement_uri.split('/')))
         return resource.put(content=content, 
                             headers={'Content-Type': content_type},
-                            rev=doc["_rev"])
 
 
 class Document(dict):
@@ -696,6 +713,7 @@ class Resource(object):
                 headers.setdefault('Content-Type', 'application/json')
             else:
                 body = content
+
         resp, data = self.http.request(uri(self.uri, path, **params), method,
                                        body=body, headers=headers)
         status_code = int(resp.status)
