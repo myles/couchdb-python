@@ -69,6 +69,13 @@ __all__ = ['Schema', 'Document', 'Field', 'TextField', 'FloatField',
 __docformat__ = 'restructuredtext en'
 
 
+class DocumentDoesNotExist(Exception):
+    """
+    The requested document does not exist in CouchDB.
+    """
+    pass
+
+
 class Field(object):
     """Basic unit for mapping a piece of data between Python and JSON.
     
