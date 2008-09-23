@@ -61,6 +61,8 @@ from datetime import date, datetime, time
 from decimal import Decimal
 from time import strptime, struct_time
 
+from couchdb.exceptions import DocumentDoesNotExist
+
 __all__ = ['Schema', 'Document', 'Field', 'TextField', 'FloatField',
            'IntegerField', 'LongField', 'BooleanField', 'DecimalField',
            'DateField', 'DateTimeField', 'TimeField', 'DictField', 'ListField']
@@ -235,7 +237,8 @@ class Document(Schema):
         """
         doc = db.get(id)
         if doc is None:
-            return None
+            # return None
+            raise DocumentDoesNotExist()
         return cls.wrap(doc)
     load = classmethod(load)
 
